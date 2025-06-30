@@ -1,0 +1,199 @@
+import { Scene, Mesh, MeshLambertMaterial, Vector3, BufferAttribute, DoubleSide, BufferGeometry } from 'three'
+import { HeightGenerator } from './HeightGenerator'
+import { WaterManager } from './WaterManager'
+import { BiomeType, BiomeTypeValue, BiomeManager } from '@/biomes/BiomeManager'
+
+interface TerrainChunk {
+    mesh: Mesh
+    position: { x: number; z: number }
+    geometry: BufferGeometry
+    material: MeshLambertMaterial
+}
+
+export class ChunkManager {
+    private scene: Scene
+    private chunks: Map<string, TerrainChunk> = new Map()
+    private heightGenerator: HeightGenerator
+    private waterManager: WaterManager
+    private biomeManager: BiomeManager
+    private chunkSize = 100
+    private chunkResolution = 64
+
+    constructor(
+        scene: Scene,
+        heightGenerator: HeightGenerator,
+        waterManager: WaterManager,
+        biomeManager: BiomeManager
+    ) {
+        this.scene = scene
+        this.heightGenerator = heightGenerator
+        this.waterManager = waterManager
+        this.biomeManager = biomeManager
+    }
+
+    generateChunk(chunkX: number, chunkZ: number): void {
+        const chunkKey = `${chunkX},${chunkZ}`
+
+        if (this.chunks.has(chunkKey)) {
+            return
+        }
+
+        // Создаём vertices и colors массивы с нуля
+        const vertices: number[] = []
+        const indices: number[] = []
+        const colors: number[] = []
+
+        // Создаём vertices сетку
+        for (let z = 0; z <= this.chunkResolution; z++) {
+            for (let x = 0; x <= this.chunkResolution; x++) {
+                // Локальные координаты в chunk (-50 до +50 для chunkSize=100)
+                const localX = (x / this.chunkResolution - 0.5) * this.chunkSize
+                const localZ = (z / this.chunkResolution - 0.5) * this.chunkSize
+
+                // Мировые координаты
+                const worldX = localX + chunkX * this.chunkSize
+                const worldZ = localZ + chunkZ * this.chunkSize
+
+                // Генерируем высоту используя шум
+                const height = this.heightGenerator.generateHeight(worldX, worldZ)
+
+                // Создаём vertices в правильной ориентации (Y вверх)
+                vertices.push(localX, height, localZ)
+
+                // Определяем биом и цвет
+                const biome = this.determineBiome(worldX, worldZ, height)
+                const color = this.biomeManager.getBiomeColor(biome, height)
+
+                colors.push(color.r, color.g, color.b)
+            }
+        }
+
+        // Создаём indices для треугольников
+        for (let z = 0; z < this.chunkResolution; z++) {
+            for (let x = 0; x < this.chunkResolution; x++) {
+                const a = z * (this.chunkResolution + 1) + x
+                const b = z * (this.chunkResolution + 1) + x + 1
+                const c = (z + 1) * (this.chunkResolution + 1) + x
+                const d = (z + 1) * (this.chunkResolution + 1) + x + 1
+
+                // Два треугольника на quad
+                indices.push(a, b, c)
+                indices.push(b, d, c)
+            }
+        }
+
+        // Создаём geometry с полными данными
+        const geometry = new BufferGeometry()
+        geometry.setAttribute('position', new BufferAttribute(new Float32Array(vertices), 3))
+        geometry.setAttribute('color', new BufferAttribute(new Float32Array(colors), 3))
+        geometry.setIndex(indices)
+        geometry.computeVertexNormals()
+
+        const material = new MeshLambertMaterial({
+            vertexColors: true,
+            side: DoubleSide,
+        })
+
+        const mesh = new Mesh(geometry, material)
+        // Не поворачиваем mesh - vertices уже в правильной ориентации
+        mesh.position.set(chunkX * this.chunkSize, 0, chunkZ * this.chunkSize)
+        mesh.receiveShadow = true // Включаем тени
+        mesh.castShadow = false // Terrain не отбрасывает тени (слишком сложно)
+
+        this.scene.add(mesh)
+
+        const chunk: TerrainChunk = {
+            mesh,
+            position: { x: chunkX, z: chunkZ },
+            geometry,
+            material,
+        }
+
+        this.chunks.set(chunkKey, chunk)
+
+        // Создаём поверхность воды для этого chunk (оба подхода)
+        this.waterManager.createWaterSurface(chunkX, chunkZ, this.chunkSize)
+
+        // Пробуем альтернативный подход для лучшего покрытия
+        this.waterManager.createWaterSurfaceAdvanced(chunkX, chunkZ, this.chunkSize)
+
+        // Проверяем соседние чанки и пересоздаем для них воду если нужно
+        this.recheckAdjacentWater(chunkX, chunkZ)
+    }
+
+    private recheckAdjacentWater(chunkX: number, chunkZ: number): void {
+        // Проверяем 8 соседних чанков
+        const adjacentChunks = [
+            [chunkX - 1, chunkZ - 1],
+            [chunkX, chunkZ - 1],
+            [chunkX + 1, chunkZ - 1],
+            [chunkX - 1, chunkZ],
+            /*[chunkX, chunkZ],*/ [chunkX + 1, chunkZ],
+            [chunkX - 1, chunkZ + 1],
+            [chunkX, chunkZ + 1],
+            [chunkX + 1, chunkZ + 1],
+        ]
+
+        for (const [adjX, adjZ] of adjacentChunks) {
+            const adjKey = `${adjX},${adjZ}`
+            if (this.chunks.has(adjKey)) {
+                // Пересоздаем воду для соседнего чанка
+                this.waterManager.createWaterSurface(adjX, adjZ, this.chunkSize)
+                this.waterManager.createWaterSurfaceAdvanced(adjX, adjZ, this.chunkSize)
+            }
+        }
+    }
+
+    private determineBiome(x: number, z: number, height: number): BiomeTypeValue {
+        // Используем heightGenerator для получения дополнительных шумов
+        const moisture = this.heightGenerator.getNoise2D(x * 0.01, z * 0.01)
+        const temperature = this.heightGenerator.getNoise2D((x + 1000) * 0.008, (z + 1000) * 0.008)
+
+        // Water - только в очень глубоких впадинах (в 10 раз реже)
+        if (height < -2) return BiomeType.WATER
+
+        // Beach/Sand - расширяем зоны песка, делаем их более частыми
+        if (height < 4 || (moisture > -0.2 && height < 8)) return BiomeType.SAND
+
+        // Mountain/Rocks - только очень высокие области (в 10 раз реже)
+        if (height > 25) return BiomeType.ROCKS
+
+        // Forest - делаем леса более частыми на средних высотах
+        if (moisture > -0.1 && temperature > -0.5 && height > 4 && height < 20) return BiomeType.FOREST
+
+        // Fields - основные равнины занимают большую часть ландшафта
+        return BiomeType.FIELDS
+    }
+
+    removeChunk(chunkKey: string): void {
+        const chunk = this.chunks.get(chunkKey)
+        if (!chunk) return
+
+        // Remove water surface
+        this.waterManager.removeWaterSurface(chunkKey)
+
+        // Remove chunk mesh
+        this.scene.remove(chunk.mesh)
+        chunk.geometry.dispose()
+        chunk.material.dispose()
+
+        this.chunks.delete(chunkKey)
+    }
+
+    getChunks(): Map<string, TerrainChunk> {
+        return this.chunks
+    }
+
+    setWireframe(enabled: boolean): void {
+        this.chunks.forEach(chunk => {
+            chunk.material.wireframe = enabled
+        })
+    }
+
+    dispose(): void {
+        this.chunks.forEach((chunk, key) => {
+            this.removeChunk(key)
+        })
+        this.chunks.clear()
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "name": "w",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "devDependencies": {
+        "prettier": "^3.6.2",
+        "typescript": "~5.8.3",
+        "vite": "^7.0.0"
+    },
+    "dependencies": {
+        "@sveltejs/vite-plugin-svelte": "^5.1.0",
+        "@types/three": "^0.177.0",
+        "dat.gui": "^0.7.9",
+        "simplex-noise": "^4.0.3",
+        "svelte": "^5.34.9",
+        "three": "^0.177.0"
+    }
+}

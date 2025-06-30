@@ -6,19 +6,25 @@
     "scripts": {
         "dev": "vite",
         "build": "tsc && vite build",
+        "build:analyze": "tsc && vite build --mode analyze",
+        "build:analyze:treemap": "ANALYZE_TEMPLATE=treemap npm run build:analyze",
+        "build:analyze:sunburst": "ANALYZE_TEMPLATE=sunburst npm run build:analyze",
+        "build:analyze:network": "ANALYZE_TEMPLATE=network npm run build:analyze",
         "preview": "vite preview",
         "format": "prettier --write .",
         "format:check": "prettier --check ."
     },
     "devDependencies": {
+        "@types/node": "^24.0.7",
         "prettier": "^3.6.2",
+        "rollup-plugin-visualizer": "^6.0.3",
+        "terser": "^5.43.1",
         "typescript": "~5.8.3",
         "vite": "^7.0.0"
     },
     "dependencies": {
         "@sveltejs/vite-plugin-svelte": "^5.1.0",
         "@types/three": "^0.177.0",
-        "dat.gui": "^0.7.9",
         "simplex-noise": "^4.0.3",
         "svelte": "^5.34.9",
         "three": "^0.177.0"

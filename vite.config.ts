@@ -49,8 +49,8 @@ export default defineConfig(({ mode }) => {
                         if (id.includes('three/examples/jsm/')) {
                             return 'three-addons'
                         }
-                        // Simplex Noise - генерация шума
-                        if (id.includes('simplex-noise')) {
+                        // TS Noise - генерация шума
+                        if (id.includes('ts-noise')) {
                             return 'noise'
                         }
                         // Svelte framework исходники

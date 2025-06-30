@@ -54,7 +54,7 @@ The right panel contains various controls to adjust:
 - **Modular Design**: Separated into focused modules
 - **TypeScript**: Full type safety and modern JavaScript features
 - **Three.js**: WebGL rendering and 3D graphics
-- **Simplex Noise**: Procedural terrain generation
+- **Perlin Noise**: Procedural terrain generation
 - **Chunk System**: Infinite world with performance optimization
 
 ### Performance Features
@@ -104,7 +104,7 @@ src/
 - **Three.js** - 3D graphics library
 - **TypeScript** - Type-safe JavaScript
 - **Vite** - Fast build tool and dev server
-- **Simplex Noise** - Procedural noise generation
+- **Perlin Noise** - Procedural noise generation
 
 ## Browser Support
 

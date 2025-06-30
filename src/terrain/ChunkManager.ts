@@ -149,17 +149,17 @@ export class ChunkManager {
         const moisture = this.heightGenerator.getNoise2D(x * 0.01, z * 0.01)
         const temperature = this.heightGenerator.getNoise2D((x + 1000) * 0.008, (z + 1000) * 0.008)
 
-        // Water - только в очень глубоких впадинах (в 10 раз реже)
-        if (height < -2) return BiomeType.WATER
+        // Water - только в самых глубоких впадинах (уменьшаем на 50%)
+        if (height < -4) return BiomeType.WATER
 
-        // Beach/Sand - расширяем зоны песка, делаем их более частыми
-        if (height < 4 || (moisture > -0.2 && height < 8)) return BiomeType.SAND
+        // Beach/Sand - уменьшаем на 35% делая условия более строгими
+        if (height < 1 || (moisture > 0.3 && temperature > 0.1 && height < 3)) return BiomeType.SAND
 
-        // Mountain/Rocks - только очень высокие области (в 10 раз реже)
-        if (height > 25) return BiomeType.ROCKS
+        // Mountain/Rocks - увеличиваем количество гор, снижаем порог
+        if (height > 15) return BiomeType.ROCKS
 
         // Forest - делаем леса более частыми на средних высотах
-        if (moisture > -0.1 && temperature > -0.5 && height > 4 && height < 20) return BiomeType.FOREST
+        if (moisture > -0.1 && temperature > -0.5 && height > 4 && height < 18) return BiomeType.FOREST
 
         // Fields - основные равнины занимают большую часть ландшафта
         return BiomeType.FIELDS

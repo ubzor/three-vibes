@@ -1,12 +1,12 @@
-import { createNoise2D } from 'simplex-noise'
+import { Perlin } from 'ts-noise'
 
 export class HeightGenerator {
-    private noise2D: any
+    private perlin: Perlin
     private heightScale = 30
     private scale = 0.015
 
     constructor() {
-        this.noise2D = createNoise2D()
+        this.perlin = new Perlin(Math.random())
     }
 
     generateHeight(x: number, z: number): number {
@@ -17,44 +17,44 @@ export class HeightGenerator {
 
         // Генерируем базовую высоту с multiple octaves
         for (let i = 0; i < 6; i++) {
-            const noiseValue = this.noise2D(x * frequency, z * frequency)
+            const noiseValue = this.perlin.get2([x * frequency, z * frequency])
             baseHeight += noiseValue * amplitude
             amplitude *= 0.5
             frequency *= 2
         }
 
         // Добавляем крупномасштабные features (горы/равнины)
-        const mountainNoise = this.noise2D(x * 0.002, z * 0.002) // Делаем горы реже
-        const hillNoise = this.noise2D(x * 0.008, z * 0.008)
+        const mountainNoise = this.perlin.get2([x * 0.001, z * 0.001]) // Укрупняем горы (было 0.002)
+        const hillNoise = this.perlin.get2([x * 0.008, z * 0.008])
 
-        // Специальный шум для создания впадин/озер - делаем их более связанными
-        const lakeNoise = this.noise2D(x * 0.003, z * 0.003) // Уменьшаем частоту для больших озер
-        const riverNoise = this.noise2D(x * 0.006, z * 0.006) // Дополнительный шум для рек
+        // Специальный шум для создания впадин/озер - оставляем крупные, убираем мелкие
+        const lakeNoise = this.perlin.get2([x * 0.002, z * 0.002]) // Еще крупнее озера (было 0.003)
+        const riverNoise = this.perlin.get2([x * 0.004, z * 0.004]) // Крупнее реки (было 0.006)
 
-        // Создаём более мягкий ландшафт с преобладанием равнин
-        let finalHeight = baseHeight * (this.heightScale * 0.6) // Уменьшаем общую высоту
+        // Создаём более разнообразный ландшафт
+        let finalHeight = baseHeight * (this.heightScale * 0.8) // Увеличиваем общую высоту для лучших гор
 
-        // Создаём глубокие впадины для озер/рек - более гибкие условия
-        if (lakeNoise < -0.6 || (riverNoise < -0.7 && lakeNoise < -0.3)) {
-            const lakeFactor = lakeNoise < -0.6 ? Math.pow(Math.abs(lakeNoise + 0.6) / 0.4, 1.5) : 0
+        // Создаём глубокие впадины для озер/рек - уменьшаем количество воды на 50%
+        if (lakeNoise < -0.75 || (riverNoise < -0.8 && lakeNoise < -0.5)) {
+            const lakeFactor = lakeNoise < -0.75 ? Math.pow(Math.abs(lakeNoise + 0.75) / 0.25, 1.5) : 0
             const riverFactor =
-                riverNoise < -0.7 && lakeNoise < -0.3 ? Math.pow(Math.abs(riverNoise + 0.7) / 0.3, 2) : 0
+                riverNoise < -0.8 && lakeNoise < -0.5 ? Math.pow(Math.abs(riverNoise + 0.8) / 0.2, 2) : 0
             const depthFactor = Math.max(lakeFactor, riverFactor)
-            finalHeight -= depthFactor * 8 // Уменьшаем глубину впадин для более плавных переходов
+            finalHeight -= depthFactor * 8 // Сохраняем глубину для крупных водоемов
         }
 
-        // Горы только в очень редких случаях - в 10 раз реже
-        if (mountainNoise > 0.7) {
-            // Было 0.2, стало 0.7 (гораздо реже)
-            const mountainFactor = Math.pow((mountainNoise - 0.7) / 0.3, 2)
-            finalHeight += mountainFactor * 35 // Немного снижаем высоту гор
+        // Горы с более низким порогом и укрупненные
+        if (mountainNoise > 0.2) {
+            // Увеличиваем количество гор (было 0.3, стало 0.2)
+            const mountainFactor = Math.pow((mountainNoise - 0.2) / 0.8, 1.2) // Более плавный рост
+            finalHeight += mountainFactor * 60 // Увеличиваем высоту гор (было 50)
         }
 
         // Увеличиваем влияние холмов для более разнообразного ландшафта
         finalHeight += hillNoise * 12
 
         // Создаём мягкие долины
-        const valleyNoise = this.noise2D(x * 0.005, z * 0.005)
+        const valleyNoise = this.perlin.get2([x * 0.005, z * 0.005])
         if (valleyNoise < -0.3) {
             finalHeight *= 0.8 // Более мягкие долины
         }
@@ -75,6 +75,6 @@ export class HeightGenerator {
 
     // Публичный метод для доступа к шуму из других классов
     getNoise2D(x: number, z: number): number {
-        return this.noise2D(x, z)
+        return this.perlin.get2([x, z])
     }
 }

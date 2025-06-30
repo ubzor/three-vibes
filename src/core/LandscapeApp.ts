@@ -12,6 +12,7 @@ import { TerrainGenerator } from '../terrain/TerrainGenerator'
 import { CameraController } from '../camera/CameraController'
 import { LightingSystem } from '../lighting/LightingSystem'
 import { UIControls } from '../utils/UIControls'
+import { defaultSettings } from '../types/UISettings'
 
 export class LandscapeApp {
     private scene: Scene
@@ -118,6 +119,8 @@ export class LandscapeApp {
     private setupLighting(): void {
         // Возвращаем профессиональную систему освещения
         this.lightingSystem.setupDayLighting()
+        // Устанавливаем время по умолчанию из настроек
+        this.lightingSystem.setTimeOfDay(defaultSettings.timeOfDay)
     }
 
     private setupControls(): void {

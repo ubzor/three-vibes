@@ -1,12 +1,77 @@
 import { Perlin } from 'ts-noise'
+import { GPUHeightGenerator, HeightmapConfig } from './GPUHeightGenerator'
+import * as THREE from 'three'
 
 export class HeightGenerator {
     private perlin: Perlin
     private heightScale = 30
     private scale = 0.015
+    private gpuGenerator: GPUHeightGenerator | null = null
+    private useGPU = false
+    private renderer: THREE.WebGLRenderer | null = null
 
-    constructor() {
+    constructor(renderer?: THREE.WebGLRenderer) {
         this.perlin = new Perlin(Math.random())
+        this.renderer = renderer || null
+    }
+
+    async enableGPUGeneration(chunkSize: number = 100, resolution: number = 128): Promise<void> {
+        if (!this.renderer) {
+            return
+        }
+
+        const config: HeightmapConfig = {
+            chunkSize,
+            resolution,
+            heightScale: this.heightScale,
+            noiseScale: this.scale,
+        }
+
+        this.gpuGenerator = new GPUHeightGenerator(this.renderer, config)
+
+        try {
+            await this.gpuGenerator.initialize()
+            this.useGPU = true
+        } catch (error) {
+            this.gpuGenerator = null
+            this.useGPU = false
+        }
+    }
+
+    // Генерация массива высот для чанка (автоматически использует GPU если доступен)
+    async generateHeightmapChunk(
+        chunkX: number,
+        chunkZ: number,
+        chunkSize: number,
+        resolution: number
+    ): Promise<Float32Array> {
+        if (this.useGPU && this.gpuGenerator) {
+            try {
+                return await this.gpuGenerator.generateHeightmapGPU(chunkX, chunkZ)
+            } catch (error) {
+                // Fallback to CPU
+            }
+        }
+
+        // CPU fallback
+        return this.generateHeightmapCPU(chunkX, chunkZ, chunkSize, resolution)
+    }
+
+    // CPU версия генерации массива высот
+    private generateHeightmapCPU(chunkX: number, chunkZ: number, chunkSize: number, resolution: number): Float32Array {
+        const heights = new Float32Array(resolution * resolution)
+
+        for (let y = 0; y < resolution; y++) {
+            for (let x = 0; x < resolution; x++) {
+                const worldX = chunkX * chunkSize + (x / resolution) * chunkSize
+                const worldZ = chunkZ * chunkSize + (y / resolution) * chunkSize
+
+                const height = this.generateHeight(worldX, worldZ)
+                heights[y * resolution + x] = height
+            }
+        }
+
+        return heights
     }
 
     generateHeight(x: number, z: number): number {
@@ -67,14 +132,26 @@ export class HeightGenerator {
 
     updateScale(newScale: number): void {
         this.scale = newScale
+        if (this.gpuGenerator) {
+            this.gpuGenerator.updateConfig({ noiseScale: newScale })
+        }
     }
 
     updateHeightScale(newHeightScale: number): void {
         this.heightScale = newHeightScale
+        if (this.gpuGenerator) {
+            this.gpuGenerator.updateConfig({ heightScale: newHeightScale })
+        }
     }
 
     // Публичный метод для доступа к шуму из других классов
     getNoise2D(x: number, z: number): number {
         return this.perlin.get2([x, z])
+    }
+
+    dispose(): void {
+        if (this.gpuGenerator) {
+            this.gpuGenerator.dispose()
+        }
     }
 }

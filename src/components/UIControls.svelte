@@ -43,8 +43,6 @@
     handleSettingChange('timeOfDay', timeValue)
   }
 
-
-
   // Экспортируем функции для обновления данных извне
   export function updateFPS(fps: number) {
     settings.fps = fps

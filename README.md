@@ -89,14 +89,16 @@ npm run build
 
 ```
 src/
-├── core/           # Main application logic
-├── terrain/        # Terrain generation system
-├── biomes/         # Biome management and objects
-├── camera/         # Camera controls
-├── lighting/       # Lighting and shadows
-├── materials/      # Materials and shaders
-├── utils/          # Utilities and UI controls
-└── shaders/        # Custom GLSL shaders
+├── core/               # Main application logic
+├── terrain/            # Terrain generation system
+├── biomes/             # Biome management and objects
+├── camera/             # Camera controls
+├── lighting/           # Lighting and shadows
+├── shaders/            # Shader management (TypeScript)
+├── assets/shaders/     # GLSL shader files
+├── utils/              # Utilities and UI controls
+├── components/         # Svelte UI components
+└── types/              # TypeScript type definitions
 ```
 
 ## Technologies Used

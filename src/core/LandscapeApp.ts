@@ -41,7 +41,7 @@ export class LandscapeApp {
         })
         this.camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000)
 
-        this.terrainGenerator = new TerrainGenerator(this.scene)
+        this.terrainGenerator = new TerrainGenerator(this.scene, this.renderer)
         this.cameraController = new CameraController(this.camera)
         this.lightingSystem = new LightingSystem(this.scene)
         this.uiControls = new UIControls(this.onSettingsChange.bind(this))
@@ -111,7 +111,6 @@ export class LandscapeApp {
         }
         ;(window as any).landscapeDebug = debugInfo
     }
-
     private async setupTerrain(): Promise<void> {
         await this.terrainGenerator.initialize()
         this.terrainGenerator.generateInitialChunks()
@@ -155,8 +154,7 @@ export class LandscapeApp {
         this.camera.updateProjectionMatrix()
         this.renderer.setSize(window.innerWidth, window.innerHeight)
     }
-
-    private onSettingsChange(settings: any): void {
+    private async onSettingsChange(settings: any): Promise<void> {
         if (settings.terrainScale !== undefined) {
             this.terrainGenerator.updateScale(settings.terrainScale)
         }

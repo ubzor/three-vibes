@@ -1,12 +1,12 @@
 import { ShaderMaterial, Vector3, Color, MeshBasicMaterial } from 'three'
 
-// Импортируем шейдеры из файлов
-import terrainVertexShader from './terrain.vert?raw'
-import terrainFragmentShader from './terrain.frag?raw'
-import waterVertexShader from './water.vert?raw'
-import waterFragmentShader from './water.frag?raw'
-import wireframeVertexShader from './wireframe.vert?raw'
-import wireframeFragmentShader from './wireframe.frag?raw'
+// Импортируем шейдеры из папки assets
+import terrainVertexShader from '../assets/shaders/terrain.vert?raw'
+import terrainFragmentShader from '../assets/shaders/terrain.frag?raw'
+import waterVertexShader from '../assets/shaders/water.vert?raw'
+import waterFragmentShader from '../assets/shaders/water.frag?raw'
+import wireframeVertexShader from '../assets/shaders/wireframe.vert?raw'
+import wireframeFragmentShader from '../assets/shaders/wireframe.frag?raw'
 
 export interface LightingUniforms {
     sunColor: Color

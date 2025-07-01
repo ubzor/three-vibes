@@ -7,6 +7,7 @@ import {
     DoubleSide,
     BufferGeometry,
     ShaderMaterial,
+    MeshBasicMaterial,
 } from 'three'
 import { HeightGenerator } from './HeightGenerator'
 import { WaterManager } from './WaterManager'
@@ -18,6 +19,7 @@ interface TerrainChunk {
     position: { x: number; z: number }
     geometry: BufferGeometry
     material: ShaderMaterial
+    wireframeMaterial: MeshBasicMaterial
 }
 
 export class ChunkManager {
@@ -29,6 +31,7 @@ export class ChunkManager {
     private shaderManager: ShaderManager
     private chunkSize = 100
     private chunkResolution = 64
+    private wireframeEnabled = false
 
     constructor(
         scene: Scene,
@@ -105,6 +108,9 @@ export class ChunkManager {
         // Используем шейдерный материал вместо MeshLambertMaterial
         const material = this.shaderManager.createNewTerrainMaterial()
 
+        // Применяем wireframe если он включен
+        material.wireframe = this.wireframeEnabled
+
         const mesh = new Mesh(geometry, material)
         // Не поворачиваем mesh - vertices уже в правильной ориентации
         mesh.position.set(chunkX * this.chunkSize, 0, chunkZ * this.chunkSize)
@@ -113,11 +119,23 @@ export class ChunkManager {
 
         this.scene.add(mesh)
 
+        // Создаем wireframe материал для террейна (черный)
+        const wireframeMaterial = new MeshBasicMaterial({
+            color: 0x000000,
+            wireframe: true,
+        })
+
+        // Если wireframe уже включен, используем wireframe материал
+        if (this.wireframeEnabled) {
+            ;(mesh as any).material = wireframeMaterial
+        }
+
         const chunk: TerrainChunk = {
             mesh,
             position: { x: chunkX, z: chunkZ },
             geometry,
             material,
+            wireframeMaterial,
         }
 
         this.chunks.set(chunkKey, chunk)
@@ -187,9 +205,10 @@ export class ChunkManager {
         this.scene.remove(chunk.mesh)
         chunk.geometry.dispose()
 
-        // Удаляем материал из отслеживания и освобождаем память
+        // Удаляем оба материала
         this.shaderManager.removeMaterial(chunk.material)
         chunk.material.dispose()
+        chunk.wireframeMaterial.dispose()
 
         this.chunks.delete(chunkKey)
     }
@@ -199,9 +218,17 @@ export class ChunkManager {
     }
 
     setWireframe(enabled: boolean): void {
+        this.wireframeEnabled = enabled
         this.chunks.forEach(chunk => {
-            chunk.material.wireframe = enabled
+            if (enabled) {
+                // Переключаем на wireframe материал
+                ;(chunk.mesh as any).material = chunk.wireframeMaterial
+            } else {
+                // Возвращаем обычный материал
+                ;(chunk.mesh as any).material = chunk.material
+            }
         })
+        this.biomeManager.setWireframe(enabled)
     }
 
     dispose(): void {

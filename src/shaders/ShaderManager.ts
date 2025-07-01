@@ -1,10 +1,12 @@
-import { ShaderMaterial, Vector3, Color } from 'three'
+import { ShaderMaterial, Vector3, Color, MeshBasicMaterial } from 'three'
 
 // Импортируем шейдеры из файлов
 import terrainVertexShader from './terrain.vert?raw'
 import terrainFragmentShader from './terrain.frag?raw'
 import waterVertexShader from './water.vert?raw'
 import waterFragmentShader from './water.frag?raw'
+import wireframeVertexShader from './wireframe.vert?raw'
+import wireframeFragmentShader from './wireframe.frag?raw'
 
 export interface LightingUniforms {
     sunColor: Color
@@ -23,6 +25,9 @@ export class ShaderManager {
     private lightingUniforms: LightingUniforms
     private allTerrainMaterials: Set<ShaderMaterial> = new Set()
     private allWaterMaterials: Set<ShaderMaterial> = new Set()
+    private wireframeEnabled = false
+    private terrainWireframeMaterial: ShaderMaterial
+    private waterWireframeMaterial: ShaderMaterial
 
     constructor() {
         this.lightingUniforms = {
@@ -38,6 +43,26 @@ export class ShaderManager {
 
         this.terrainMaterial = this.createTerrainMaterial()
         this.waterMaterial = this.createWaterMaterial()
+
+        // Создаем wireframe материалы
+        this.terrainWireframeMaterial = new ShaderMaterial({
+            uniforms: {
+                uWireframeColor: { value: new Color(0x000000) }, // Черный для террейна
+            },
+            vertexShader: wireframeVertexShader,
+            fragmentShader: wireframeFragmentShader,
+            wireframe: true,
+        })
+
+        this.waterWireframeMaterial = new ShaderMaterial({
+            uniforms: {
+                uWireframeColor: { value: new Color(0x0066ff) }, // Синий для воды
+            },
+            vertexShader: wireframeVertexShader,
+            fragmentShader: wireframeFragmentShader,
+            wireframe: true,
+            transparent: true,
+        })
 
         // Добавляем основные материалы в отслеживание
         this.allTerrainMaterials.add(this.terrainMaterial)
@@ -69,6 +94,7 @@ export class ShaderManager {
             transparent: false,
             depthWrite: true,
             depthTest: true,
+            wireframe: false,
         })
     }
 
@@ -95,6 +121,7 @@ export class ShaderManager {
             fragmentShader: waterFragmentShader,
             transparent: true,
             depthWrite: false,
+            wireframe: false,
         })
     }
 
@@ -108,12 +135,14 @@ export class ShaderManager {
 
     createNewTerrainMaterial(): ShaderMaterial {
         const material = this.createTerrainMaterial()
+        material.wireframe = this.wireframeEnabled
         this.allTerrainMaterials.add(material)
         return material
     }
 
     createNewWaterMaterial(): ShaderMaterial {
         const material = this.createWaterMaterial()
+        material.wireframe = this.wireframeEnabled
         this.allWaterMaterials.add(material)
         return material
     }
@@ -197,5 +226,25 @@ export class ShaderManager {
     removeMaterial(material: ShaderMaterial): void {
         this.allTerrainMaterials.delete(material)
         this.allWaterMaterials.delete(material)
+    }
+
+    setWireframe(enabled: boolean): void {
+        this.wireframeEnabled = enabled
+
+        // Применяем wireframe ко всем существующим материалам
+        this.allTerrainMaterials.forEach(material => {
+            material.wireframe = enabled
+        })
+        this.allWaterMaterials.forEach(material => {
+            material.wireframe = enabled
+        })
+    }
+
+    getTerrainWireframeMaterial(): ShaderMaterial {
+        return this.terrainWireframeMaterial
+    }
+
+    getWaterWireframeMaterial(): ShaderMaterial {
+        return this.waterWireframeMaterial
     }
 }

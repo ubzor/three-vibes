@@ -101,6 +101,8 @@ export class TerrainGenerator {
 
     setWireframe(enabled: boolean): void {
         this.chunkManager.setWireframe(enabled)
+        this.waterManager.setWireframe(enabled)
+        this.biomeManager.setWireframe(enabled)
     }
 
     getShaderManager(): ShaderManager {

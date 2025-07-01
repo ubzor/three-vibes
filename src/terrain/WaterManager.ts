@@ -1,13 +1,20 @@
-import { Scene, Mesh, PlaneGeometry, MeshPhongMaterial, DoubleSide, ShaderMaterial } from 'three'
+import { Scene, Mesh, PlaneGeometry, MeshPhongMaterial, DoubleSide, ShaderMaterial, MeshBasicMaterial } from 'three'
 import { HeightGenerator } from './HeightGenerator'
 import { ShaderManager } from '@/shaders/ShaderManager'
+
+interface WaterMeshData {
+    mesh: Mesh
+    originalMaterial: ShaderMaterial
+    wireframeMaterial: MeshBasicMaterial
+}
 
 export class WaterManager {
     private scene: Scene
     private heightGenerator: HeightGenerator
     private shaderManager: ShaderManager
-    private waterMeshes: Map<string, Mesh> = new Map()
+    private waterMeshes: Map<string, WaterMeshData> = new Map()
     private waterLevel = -2 // Единый уровень воды
+    private wireframeEnabled = false
 
     constructor(scene: Scene, heightGenerator: HeightGenerator, shaderManager: ShaderManager) {
         this.scene = scene
@@ -167,43 +174,69 @@ export class WaterManager {
         // Используем шейдерный материал для воды
         const waterMaterial = this.shaderManager.createNewWaterMaterial()
 
+        // Создаем wireframe материал для воды (синий)
+        const wireframeMaterial = new MeshBasicMaterial({
+            color: 0x0066ff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.8,
+        })
+
         const waterMesh = new Mesh(waterGeometry, waterMaterial)
         waterMesh.rotation.x = -Math.PI / 2
         waterMesh.position.set(chunkX * chunkSize, this.waterLevel, chunkZ * chunkSize)
         waterMesh.receiveShadow = true
         waterMesh.castShadow = false
 
+        // Если wireframe включен, используем wireframe материал
+        if (this.wireframeEnabled) {
+            ;(waterMesh as any).material = wireframeMaterial
+        }
+
         this.scene.add(waterMesh)
 
         // Сохраняем reference
         const chunkKey = `${chunkX},${chunkZ}`
-        this.waterMeshes.set(chunkKey, waterMesh)
+        const waterData: WaterMeshData = {
+            mesh: waterMesh,
+            originalMaterial: waterMaterial,
+            wireframeMaterial: wireframeMaterial,
+        }
+        this.waterMeshes.set(chunkKey, waterData)
     }
 
     removeWaterSurface(chunkKey: string): void {
-        const waterMesh = this.waterMeshes.get(chunkKey)
-        if (waterMesh) {
-            this.scene.remove(waterMesh)
-            if (waterMesh.geometry) waterMesh.geometry.dispose()
-            if (waterMesh.material) {
-                if (Array.isArray(waterMesh.material)) {
-                    waterMesh.material.forEach(mat => {
-                        this.shaderManager.removeMaterial(mat as any)
-                        mat.dispose()
-                    })
-                } else {
-                    this.shaderManager.removeMaterial(waterMesh.material as any)
-                    waterMesh.material.dispose()
-                }
-            }
+        const waterData = this.waterMeshes.get(chunkKey)
+        if (waterData) {
+            this.scene.remove(waterData.mesh)
+            if (waterData.mesh.geometry) waterData.mesh.geometry.dispose()
+
+            // Удаляем оба материала
+            this.shaderManager.removeMaterial(waterData.originalMaterial)
+            waterData.originalMaterial.dispose()
+            waterData.wireframeMaterial.dispose()
+
             this.waterMeshes.delete(chunkKey)
         }
     }
 
     dispose(): void {
-        this.waterMeshes.forEach((waterMesh, key) => {
+        this.waterMeshes.forEach((waterData, key) => {
             this.removeWaterSurface(key)
         })
         this.waterMeshes.clear()
+    }
+
+    setWireframe(enabled: boolean): void {
+        this.wireframeEnabled = enabled
+        this.waterMeshes.forEach(waterData => {
+            if (enabled) {
+                // Переключаем на wireframe материал
+                ;(waterData.mesh as any).material = waterData.wireframeMaterial
+            } else {
+                // Возвращаем обычный материал
+                ;(waterData.mesh as any).material = waterData.originalMaterial
+            }
+        })
     }
 }

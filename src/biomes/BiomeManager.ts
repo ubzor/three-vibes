@@ -30,6 +30,7 @@ export class BiomeManager {
     private treeMaterial!: MeshLambertMaterial
     private rockMaterial!: MeshLambertMaterial
     private grassMaterial!: MeshLambertMaterial
+    private wireframeEnabled = false
 
     constructor() {
         this.initializeBiomes()
@@ -139,6 +140,7 @@ export class BiomeManager {
         const leavesGeometry = new SphereGeometry(leavesSize, 8, 6)
         const leafColor = new Color().setHSL(0.25 + Math.random() * 0.1, 0.6, 0.3 + Math.random() * 0.2)
         const leavesMaterial = new MeshLambertMaterial({ color: leafColor })
+        leavesMaterial.wireframe = this.wireframeEnabled
         const leaves = new Mesh(leavesGeometry, leavesMaterial)
         leaves.position.y = trunkHeight + leavesSize * 0.7
         tree.add(leaves)
@@ -176,8 +178,16 @@ export class BiomeManager {
     private createBush(): Object3D {
         const bushGeometry = new SphereGeometry(0.8, 6, 4)
         const bushMaterial = new MeshLambertMaterial({ color: 0x228b22 })
+        bushMaterial.wireframe = this.wireframeEnabled
         const bush = new Mesh(bushGeometry, bushMaterial)
         bush.scale.y = 0.6
         return bush
+    }
+
+    setWireframe(enabled: boolean): void {
+        this.wireframeEnabled = enabled
+        this.treeMaterial.wireframe = enabled
+        this.rockMaterial.wireframe = enabled
+        this.grassMaterial.wireframe = enabled
     }
 }

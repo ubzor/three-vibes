@@ -1,15 +1,18 @@
-import { Scene, Mesh, PlaneGeometry, MeshPhongMaterial, DoubleSide } from 'three'
+import { Scene, Mesh, PlaneGeometry, MeshPhongMaterial, DoubleSide, ShaderMaterial } from 'three'
 import { HeightGenerator } from './HeightGenerator'
+import { ShaderManager } from '@/shaders/ShaderManager'
 
 export class WaterManager {
     private scene: Scene
     private heightGenerator: HeightGenerator
+    private shaderManager: ShaderManager
     private waterMeshes: Map<string, Mesh> = new Map()
     private waterLevel = -2 // Единый уровень воды
 
-    constructor(scene: Scene, heightGenerator: HeightGenerator) {
+    constructor(scene: Scene, heightGenerator: HeightGenerator, shaderManager: ShaderManager) {
         this.scene = scene
         this.heightGenerator = heightGenerator
+        this.shaderManager = shaderManager
     }
 
     createWaterSurface(chunkX: number, chunkZ: number, chunkSize: number): void {
@@ -158,16 +161,11 @@ export class WaterManager {
     }
 
     private createWaterMesh(chunkX: number, chunkZ: number, chunkSize: number): void {
-        // Простая геометрия без сложной анимации
-        const waterGeometry = new PlaneGeometry(chunkSize, chunkSize, 1, 1)
+        // Простая геометрия для воды
+        const waterGeometry = new PlaneGeometry(chunkSize, chunkSize, 32, 32)
 
-        const waterMaterial = new MeshPhongMaterial({
-            color: 0x0077be, // Яркий синий цвет
-            transparent: true,
-            opacity: 0.8,
-            shininess: 100,
-            side: DoubleSide,
-        })
+        // Используем шейдерный материал для воды
+        const waterMaterial = this.shaderManager.createNewWaterMaterial()
 
         const waterMesh = new Mesh(waterGeometry, waterMaterial)
         waterMesh.rotation.x = -Math.PI / 2
@@ -189,8 +187,12 @@ export class WaterManager {
             if (waterMesh.geometry) waterMesh.geometry.dispose()
             if (waterMesh.material) {
                 if (Array.isArray(waterMesh.material)) {
-                    waterMesh.material.forEach(mat => mat.dispose())
+                    waterMesh.material.forEach(mat => {
+                        this.shaderManager.removeMaterial(mat as any)
+                        mat.dispose()
+                    })
                 } else {
+                    this.shaderManager.removeMaterial(waterMesh.material as any)
                     waterMesh.material.dispose()
                 }
             }

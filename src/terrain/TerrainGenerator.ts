@@ -3,6 +3,7 @@ import { BiomeManager } from '@/biomes/BiomeManager'
 import { HeightGenerator } from './HeightGenerator'
 import { WaterManager } from './WaterManager'
 import { ChunkManager } from './ChunkManager'
+import { ShaderManager } from '@/shaders/ShaderManager'
 
 export class TerrainGenerator {
     private scene: Scene
@@ -10,6 +11,7 @@ export class TerrainGenerator {
     private heightGenerator: HeightGenerator
     private waterManager: WaterManager
     private chunkManager: ChunkManager
+    private shaderManager: ShaderManager
     private renderDistance = 2
     private chunkSize = 100
 
@@ -17,8 +19,15 @@ export class TerrainGenerator {
         this.scene = scene
         this.biomeManager = new BiomeManager()
         this.heightGenerator = new HeightGenerator()
-        this.waterManager = new WaterManager(scene, this.heightGenerator)
-        this.chunkManager = new ChunkManager(scene, this.heightGenerator, this.waterManager, this.biomeManager)
+        this.shaderManager = new ShaderManager()
+        this.waterManager = new WaterManager(scene, this.heightGenerator, this.shaderManager)
+        this.chunkManager = new ChunkManager(
+            scene,
+            this.heightGenerator,
+            this.waterManager,
+            this.biomeManager,
+            this.shaderManager
+        )
     }
 
     async initialize(): Promise<void> {
@@ -87,9 +96,14 @@ export class TerrainGenerator {
     dispose(): void {
         this.chunkManager.dispose()
         this.waterManager.dispose()
+        this.shaderManager.dispose()
     }
 
     setWireframe(enabled: boolean): void {
         this.chunkManager.setWireframe(enabled)
+    }
+
+    getShaderManager(): ShaderManager {
+        return this.shaderManager
     }
 }

@@ -121,6 +121,10 @@ export class LandscapeApp {
         this.lightingSystem.setupDayLighting()
         // Устанавливаем время по умолчанию из настроек
         this.lightingSystem.setTimeOfDay(defaultSettings.timeOfDay)
+
+        // Связываем систему освещения с шейдерами
+        const shaderManager = this.terrainGenerator.getShaderManager()
+        this.lightingSystem.setShaderManager(shaderManager)
     }
 
     private setupControls(): void {
@@ -214,6 +218,13 @@ export class LandscapeApp {
 
     private update(): void {
         this.cameraController.update()
+
+        // Обновляем шейдеры с временем и позицией камеры
+        const shaderManager = this.terrainGenerator.getShaderManager()
+        const currentTime = performance.now() * 0.001 // Конвертируем в секунды
+        shaderManager.updateTime(currentTime)
+        shaderManager.updateCameraPosition(this.camera.position)
+
         this.terrainGenerator.update(this.camera.position)
         this.lightingSystem.update()
 

@@ -1,13 +1,23 @@
-import { Scene, Mesh, MeshLambertMaterial, Vector3, BufferAttribute, DoubleSide, BufferGeometry } from 'three'
+import {
+    Scene,
+    Mesh,
+    MeshLambertMaterial,
+    Vector3,
+    BufferAttribute,
+    DoubleSide,
+    BufferGeometry,
+    ShaderMaterial,
+} from 'three'
 import { HeightGenerator } from './HeightGenerator'
 import { WaterManager } from './WaterManager'
 import { BiomeType, BiomeTypeValue, BiomeManager } from '@/biomes/BiomeManager'
+import { ShaderManager } from '@/shaders/ShaderManager'
 
 interface TerrainChunk {
     mesh: Mesh
     position: { x: number; z: number }
     geometry: BufferGeometry
-    material: MeshLambertMaterial
+    material: ShaderMaterial
 }
 
 export class ChunkManager {
@@ -16,6 +26,7 @@ export class ChunkManager {
     private heightGenerator: HeightGenerator
     private waterManager: WaterManager
     private biomeManager: BiomeManager
+    private shaderManager: ShaderManager
     private chunkSize = 100
     private chunkResolution = 64
 
@@ -23,12 +34,14 @@ export class ChunkManager {
         scene: Scene,
         heightGenerator: HeightGenerator,
         waterManager: WaterManager,
-        biomeManager: BiomeManager
+        biomeManager: BiomeManager,
+        shaderManager: ShaderManager
     ) {
         this.scene = scene
         this.heightGenerator = heightGenerator
         this.waterManager = waterManager
         this.biomeManager = biomeManager
+        this.shaderManager = shaderManager
     }
 
     generateChunk(chunkX: number, chunkZ: number): void {
@@ -76,9 +89,9 @@ export class ChunkManager {
                 const c = (z + 1) * (this.chunkResolution + 1) + x
                 const d = (z + 1) * (this.chunkResolution + 1) + x + 1
 
-                // Два треугольника на quad
-                indices.push(a, b, c)
-                indices.push(b, d, c)
+                // Два треугольника на quad (правильный порядок для фронтальных нормалей)
+                indices.push(a, c, b)
+                indices.push(b, c, d)
             }
         }
 
@@ -89,10 +102,8 @@ export class ChunkManager {
         geometry.setIndex(indices)
         geometry.computeVertexNormals()
 
-        const material = new MeshLambertMaterial({
-            vertexColors: true,
-            side: DoubleSide,
-        })
+        // Используем шейдерный материал вместо MeshLambertMaterial
+        const material = this.shaderManager.createNewTerrainMaterial()
 
         const mesh = new Mesh(geometry, material)
         // Не поворачиваем mesh - vertices уже в правильной ориентации
@@ -175,6 +186,9 @@ export class ChunkManager {
         // Remove chunk mesh
         this.scene.remove(chunk.mesh)
         chunk.geometry.dispose()
+
+        // Удаляем материал из отслеживания и освобождаем память
+        this.shaderManager.removeMaterial(chunk.material)
         chunk.material.dispose()
 
         this.chunks.delete(chunkKey)

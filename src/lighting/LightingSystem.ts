@@ -1,4 +1,5 @@
 import { Scene, DirectionalLight, AmbientLight, HemisphereLight, Vector3, MathUtils, PointLight, Color } from 'three'
+import { ShaderManager, LightingUniforms } from '@/shaders/ShaderManager'
 
 export class LightingSystem {
     private scene: Scene
@@ -9,12 +10,18 @@ export class LightingSystem {
     private sunPosition: Vector3
     private moonPosition: Vector3
     private timeOfDay: number = 0.5 // 0 = midnight, 0.5 = noon, 1 = midnight
+    private shaderManager: ShaderManager | null = null
 
     constructor(scene: Scene) {
         this.scene = scene
         this.sunPosition = new Vector3()
         this.moonPosition = new Vector3()
         this.createLights()
+    }
+
+    setShaderManager(shaderManager: ShaderManager): void {
+        this.shaderManager = shaderManager
+        this.updateShaderLighting()
     }
 
     private createLights(): void {
@@ -100,6 +107,9 @@ export class LightingSystem {
         this.updateMoonPosition()
         this.updateLightColors()
         this.updateLightIntensity()
+
+        // Обновляем шейдеры после всех изменений освещения
+        this.updateShaderLighting()
     }
 
     private updateSunPosition(): void {
@@ -266,6 +276,8 @@ export class LightingSystem {
         this.updateMoonPosition()
         this.updateLightColors()
         this.updateLightIntensity()
+        // Обновляем шейдеры после изменения времени
+        this.updateShaderLighting()
     }
 
     getSunDirection(): Vector3 {
@@ -288,6 +300,23 @@ export class LightingSystem {
         pointLight.shadow.mapSize.setScalar(512)
         this.scene.add(pointLight)
         return pointLight
+    }
+
+    private updateShaderLighting(): void {
+        if (!this.shaderManager) return
+
+        const lightingData: Partial<LightingUniforms> = {
+            sunColor: this.sunLight.color,
+            sunDirection: this.sunPosition.clone().normalize(),
+            sunIntensity: this.sunLight.intensity,
+            ambientColor: this.ambientLight.color,
+            ambientIntensity: this.ambientLight.intensity,
+            fogColor: this.scene.fog ? (this.scene.fog as any).color : new Color(0x87ceeb),
+            fogNear: this.scene.fog ? (this.scene.fog as any).near : 150,
+            fogFar: this.scene.fog ? (this.scene.fog as any).far : 1000,
+        }
+
+        this.shaderManager.updateLighting(lightingData)
     }
 
     dispose(): void {

@@ -34,7 +34,6 @@ A realistic 3D procedural landscape generator built with Three.js, TypeScript, a
 The right panel contains various controls to adjust:
 
 - **Performance Monitoring**: Real-time FPS and triangle count display
-- Terrain scale and complexity
 - Render distance
 - Time of day and lighting
 - Wireframe mode

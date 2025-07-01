@@ -13,6 +13,7 @@ import { HeightGenerator } from './HeightGenerator'
 import { WaterManager } from './WaterManager'
 import { BiomeType, BiomeTypeValue, BiomeManager } from '@/biomes/BiomeManager'
 import { ShaderManager } from '@/shaders/ShaderManager'
+import { globalProfiler } from '@/utils/Profiler'
 
 interface TerrainChunk {
     mesh: Mesh
@@ -46,11 +47,87 @@ export class ChunkManager {
         this.biomeManager = biomeManager
         this.shaderManager = shaderManager
     }
-
     generateChunk(chunkX: number, chunkZ: number): void {
         const chunkKey = `${chunkX},${chunkZ}`
 
         if (this.chunks.has(chunkKey)) {
+            return
+        }
+
+        // Используем упрощенную генерацию без детального профайлинга
+        this.generateChunkGeometry(chunkX, chunkZ)
+        this.createChunkMesh(chunkX, chunkZ)
+
+        // Создаём поверхность воды для этого chunk
+        this.waterManager.createWaterSurface(chunkX, chunkZ, this.chunkSize)
+        this.waterManager.createWaterSurfaceAdvanced(chunkX, chunkZ, this.chunkSize)
+        this.recheckAdjacentWater(chunkX, chunkZ)
+    }
+
+    // Групповая генерация чанков с профайлингом
+    generateChunks(chunks: Array<{ x: number; z: number }>): void {
+        if (chunks.length === 0) return
+
+        const geometryStartTime = performance.now()
+        let geometryChunks = 0
+
+        globalProfiler.startStep('📐 Geometry Generation')
+        for (const chunk of chunks) {
+            if (!this.chunks.has(`${chunk.x},${chunk.z}`)) {
+                this.generateChunkGeometry(chunk.x, chunk.z)
+                geometryChunks++
+            }
+        }
+        globalProfiler.endStep()
+
+        const materialStartTime = performance.now()
+        let materialChunks = 0
+
+        globalProfiler.startStep('🎨 Materials & Meshes')
+        for (const chunk of chunks) {
+            const chunkKey = `${chunk.x},${chunk.z}`
+            if (this.pendingChunks.has(chunkKey)) {
+                this.createChunkMesh(chunk.x, chunk.z)
+                materialChunks++
+            }
+        }
+        globalProfiler.endStep()
+
+        const waterStartTime = performance.now()
+        let waterChunks = 0
+
+        globalProfiler.startStep('💧 Water Generation')
+        for (const chunk of chunks) {
+            const chunkKey = `${chunk.x},${chunk.z}`
+            if (this.chunks.has(chunkKey)) {
+                this.waterManager.createWaterSurface(chunk.x, chunk.z, this.chunkSize)
+                this.waterManager.createWaterSurfaceAdvanced(chunk.x, chunk.z, this.chunkSize)
+                this.recheckAdjacentWater(chunk.x, chunk.z)
+                waterChunks++
+            }
+        }
+        globalProfiler.endStep()
+
+        console.log(
+            `🔧 Chunk batch processed: ${geometryChunks} geometry, ${materialChunks} materials, ${waterChunks} water`
+        )
+    }
+
+    // Временное хранилище для геометрии чанков
+    private pendingChunks: Map<
+        string,
+        {
+            vertices: Float32Array
+            indices: Uint32Array
+            colors: Float32Array
+            position: { x: number; z: number }
+        }
+    > = new Map()
+
+    private generateChunkGeometry(chunkX: number, chunkZ: number): void {
+        const chunkKey = `${chunkX},${chunkZ}`
+
+        if (this.chunks.has(chunkKey) || this.pendingChunks.has(chunkKey)) {
             return
         }
 
@@ -98,11 +175,26 @@ export class ChunkManager {
             }
         }
 
+        // Сохраняем геометрию для последующей обработки
+        this.pendingChunks.set(chunkKey, {
+            vertices: new Float32Array(vertices),
+            indices: new Uint32Array(indices),
+            colors: new Float32Array(colors),
+            position: { x: chunkX, z: chunkZ },
+        })
+    }
+
+    private createChunkMesh(chunkX: number, chunkZ: number): void {
+        const chunkKey = `${chunkX},${chunkZ}`
+        const pendingChunk = this.pendingChunks.get(chunkKey)
+
+        if (!pendingChunk) return
+
         // Создаём geometry с полными данными
         const geometry = new BufferGeometry()
-        geometry.setAttribute('position', new BufferAttribute(new Float32Array(vertices), 3))
-        geometry.setAttribute('color', new BufferAttribute(new Float32Array(colors), 3))
-        geometry.setIndex(indices)
+        geometry.setAttribute('position', new BufferAttribute(pendingChunk.vertices, 3))
+        geometry.setAttribute('color', new BufferAttribute(pendingChunk.colors, 3))
+        geometry.setIndex(Array.from(pendingChunk.indices))
         geometry.computeVertexNormals()
 
         // Используем шейдерный материал вместо MeshLambertMaterial
@@ -112,10 +204,9 @@ export class ChunkManager {
         material.wireframe = this.wireframeEnabled
 
         const mesh = new Mesh(geometry, material)
-        // Не поворачиваем mesh - vertices уже в правильной ориентации
         mesh.position.set(chunkX * this.chunkSize, 0, chunkZ * this.chunkSize)
-        mesh.receiveShadow = true // Включаем тени
-        mesh.castShadow = false // Terrain не отбрасывает тени (слишком сложно)
+        mesh.receiveShadow = true
+        mesh.castShadow = false
 
         this.scene.add(mesh)
 
@@ -139,15 +230,7 @@ export class ChunkManager {
         }
 
         this.chunks.set(chunkKey, chunk)
-
-        // Создаём поверхность воды для этого chunk (оба подхода)
-        this.waterManager.createWaterSurface(chunkX, chunkZ, this.chunkSize)
-
-        // Пробуем альтернативный подход для лучшего покрытия
-        this.waterManager.createWaterSurfaceAdvanced(chunkX, chunkZ, this.chunkSize)
-
-        // Проверяем соседние чанки и пересоздаем для них воду если нужно
-        this.recheckAdjacentWater(chunkX, chunkZ)
+        this.pendingChunks.delete(chunkKey)
     }
 
     private recheckAdjacentWater(chunkX: number, chunkZ: number): void {

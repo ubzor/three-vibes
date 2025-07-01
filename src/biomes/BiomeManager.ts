@@ -8,6 +8,7 @@ import {
     PlaneGeometry,
     Object3D,
 } from 'three'
+import { globalProfiler } from '@/utils/Profiler'
 
 export const BiomeType = {
     FOREST: 'forest',
@@ -38,7 +39,18 @@ export class BiomeManager {
     }
 
     async initialize(): Promise<void> {
-        // BiomeManager initialized
+        globalProfiler.startStep('🌿 Biome Configuration')
+
+        globalProfiler.measure('🎨 Biome Colors Setup', () => this.initializeBiomes())
+        globalProfiler.measure('🎭 Materials Creation', () => this.initializeMaterials())
+
+        globalProfiler.endStep()
+    }
+
+    private initializeMaterials(): void {
+        this.treeMaterial = new MeshLambertMaterial({ color: 0x4d7c0f })
+        this.rockMaterial = new MeshLambertMaterial({ color: 0xa8a29e })
+        this.grassMaterial = new MeshLambertMaterial({ color: 0x84cc16 })
     }
 
     private initializeBiomes(): void {

@@ -78,23 +78,6 @@
   </div>
 
   
-  <!-- Terrain Scale -->
-  <div class="control-group">
-    <div class="control-header">
-      <label for="terrain-scale">Terrain Scale:</label>
-      <span class="control-value">{settings.terrainScale}</span>
-    </div>
-    <input 
-      type="range" 
-      id="terrain-scale" 
-      min="0.005" 
-      max="0.1" 
-      step="0.005" 
-      bind:value={settings.terrainScale}
-      oninput={() => handleSettingChange('terrainScale', settings.terrainScale)}
-    >
-  </div>
-
   <!-- Render Distance -->
   <div class="control-group">
     <div class="control-header">

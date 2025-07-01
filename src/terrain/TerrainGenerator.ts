@@ -4,6 +4,7 @@ import { HeightGenerator } from './HeightGenerator'
 import { WaterManager } from './WaterManager'
 import { ChunkManager } from './ChunkManager'
 import { ShaderManager } from '@/shaders/ShaderManager'
+import { globalProfiler } from '@/utils/Profiler'
 
 export class TerrainGenerator {
     private scene: Scene
@@ -12,7 +13,7 @@ export class TerrainGenerator {
     private waterManager: WaterManager
     private chunkManager: ChunkManager
     private shaderManager: ShaderManager
-    private renderDistance = 2
+    private renderDistance = 6
     private chunkSize = 100
     private renderer: WebGLRenderer | null = null
 
@@ -32,32 +33,47 @@ export class TerrainGenerator {
         )
     }
     async initialize(): Promise<void> {
-        await this.biomeManager.initialize()
+        await globalProfiler.measureAsync('🌱 Biome Manager Init', () => this.biomeManager.initialize())
 
         // Включаем GPU генерацию по умолчанию
         if (this.renderer) {
             try {
-                await this.heightGenerator.enableGPUGeneration(this.chunkSize, 128)
+                await globalProfiler.measureAsync('🖥️ GPU Height Generation Setup', () =>
+                    this.heightGenerator.enableGPUGeneration(this.chunkSize, 128)
+                )
             } catch (error) {
-                // Fallback to CPU
+                console.warn('GPU generation failed, falling back to CPU')
             }
         }
     }
-
     generateInitialChunks(): void {
+        globalProfiler.startStep('🗺️ Initial Chunk Generation')
+
         const centerChunkX = 0
         const centerChunkZ = 0
 
-        // Генерируем чанки в круговом радиусе
+        let chunksGenerated = 0
+        const totalChunks = (this.renderDistance * 2 + 1) ** 2
+
+        // Подготавливаем массив чанков для генерации
+        const chunksToGenerate: Array<{ x: number; z: number }> = []
+
         for (let x = -this.renderDistance; x <= this.renderDistance; x++) {
             for (let z = -this.renderDistance; z <= this.renderDistance; z++) {
-                // Проверяем, находится ли чанк в круговом радиусе
                 const distance = Math.sqrt(x * x + z * z)
                 if (distance <= this.renderDistance) {
-                    this.chunkManager.generateChunk(centerChunkX + x, centerChunkZ + z)
+                    chunksToGenerate.push({ x: centerChunkX + x, z: centerChunkZ + z })
                 }
             }
         }
+
+        // Генерируем все чанки сразу с групповым профайлингом
+        globalProfiler.measure(`📦 Chunk Generation (${chunksToGenerate.length} chunks)`, () => {
+            this.chunkManager.generateChunks(chunksToGenerate)
+        })
+
+        globalProfiler.endStep()
+        console.log(`✅ Generated ${chunksToGenerate.length} chunks out of ${totalChunks} possible`)
     }
 
     update(cameraPosition: Vector3): void {
@@ -97,11 +113,6 @@ export class TerrainGenerator {
         chunksToRemove.forEach(key => {
             this.chunkManager.removeChunk(key)
         })
-    }
-
-    updateScale(newScale: number): void {
-        this.heightGenerator.updateScale(newScale)
-        this.regenerateAllChunks()
     }
 
     updateRenderDistance(newDistance: number): void {

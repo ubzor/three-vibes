@@ -1,23 +1,15 @@
-#version 310 es
+uniform vec2 u_chunkOffset;
+uniform vec2 u_chunkSize;
+uniform vec2 u_resolution;
+uniform float u_heightScale;
+uniform float u_noiseScale;
+uniform float u_time;
+uniform vec4 u_noiseSeeds;
+uniform float u_useFloatTexture;
 
-// Compute shader для генерации карты высот
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+varying vec2 vUv;
 
-// Выходной буфер для высот
-layout(std430, binding = 0) restrict writeonly buffer HeightBuffer {
-    float heights[];
-};
-
-// Uniforms
-uniform vec2 u_chunkOffset;     // Смещение чанка в мировых координатах
-uniform vec2 u_chunkSize;       // Размер чанка
-uniform vec2 u_resolution;      // Разрешение карты высот (width, height)
-uniform float u_heightScale;   // Масштаб высоты
-uniform float u_noiseScale;    // Масштаб шума
-uniform float u_time;          // Время для анимации (если нужно)
-uniform vec4 u_noiseSeeds;     // Семена для разных слоев шума
-
-// Простая реализация Perlin noise
+// Реализация шума
 vec2 hash(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
@@ -26,7 +18,6 @@ vec2 hash(vec2 p) {
 float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    
     vec2 u = f * f * (3.0 - 2.0 * f);
     
     return mix(mix(dot(hash(i + vec2(0.0, 0.0)), f - vec2(0.0, 0.0)),
@@ -35,7 +26,6 @@ float noise(vec2 p) {
                    dot(hash(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x), u.y);
 }
 
-// Функция для генерации фрактального шума (несколько октав)
 float fractalNoise(vec2 p, int octaves, float persistence) {
     float value = 0.0;
     float amplitude = 1.0;
@@ -53,35 +43,19 @@ float fractalNoise(vec2 p, int octaves, float persistence) {
 }
 
 void main() {
-    // Получаем координаты текущего пикселя
-    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
-    
-    // Проверяем границы
-    if (coord.x >= int(u_resolution.x) || coord.y >= int(u_resolution.y)) {
-        return;
-    }
-    
-    // Вычисляем мировые координаты
-    vec2 worldPos = u_chunkOffset + vec2(coord) * u_chunkSize / u_resolution;
-    
-    // Применяем масштаб шума
+    vec2 coord = vUv * u_resolution;
+    vec2 worldPos = u_chunkOffset + coord * u_chunkSize / u_resolution;
     vec2 noisePos = worldPos * u_noiseScale;
     
-    // Генерируем базовую высоту с несколькими октавами
+    // Генерируем высоту
     float baseHeight = fractalNoise(noisePos + u_noiseSeeds.xy, 6, 0.5);
-    
-    // Добавляем крупномасштабные features (горы/равнины)
     float mountainNoise = noise((worldPos + u_noiseSeeds.zw) * 0.001);
     float hillNoise = noise((worldPos + u_noiseSeeds.xy * 2.0) * 0.008);
-    
-    // Специальный шум для создания впадин/озер
     float lakeNoise = noise((worldPos + u_noiseSeeds.zw * 0.5) * 0.002);
     float riverNoise = noise((worldPos + u_noiseSeeds.xy * 0.7) * 0.004);
     
-    // Создаём более разнообразный ландшафт
     float finalHeight = baseHeight * (u_heightScale * 0.8);
     
-    // Создаём глубокие впадины для озер/рек
     if (lakeNoise < -0.75 || (riverNoise < -0.8 && lakeNoise < -0.5)) {
         float lakeFactor = lakeNoise < -0.75 ? pow(abs(lakeNoise + 0.75) / 0.25, 1.5) : 0.0;
         float riverFactor = (riverNoise < -0.8 && lakeNoise < -0.5) ? 
@@ -90,25 +64,29 @@ void main() {
         finalHeight -= depthFactor * 8.0;
     }
     
-    // Горы
     if (mountainNoise > 0.2) {
         float mountainFactor = pow((mountainNoise - 0.2) / 0.8, 1.2);
         finalHeight += mountainFactor * 60.0;
     }
     
-    // Холмы
     finalHeight += hillNoise * 12.0;
     
-    // Долины
     float valleyNoise = noise((worldPos + u_noiseSeeds.xy * 1.3) * 0.005);
     if (valleyNoise < -0.3) {
         finalHeight *= 0.8;
     }
     
-    // Поднимаем общий уровень
     finalHeight += 5.0;
     
-    // Записываем результат в буфер
-    int index = coord.y * int(u_resolution.x) + coord.x;
-    heights[index] = finalHeight;
+    // Кодируем высоту в цвет в зависимости от типа текстуры
+    float encodedHeight;
+    if (u_useFloatTexture > 0.5) {
+        // Для float текстур нормализуем в диапазон [0,1]
+        encodedHeight = finalHeight / 100.0;
+    } else {
+        // Для byte текстур кодируем диапазон [-50,150] в [0,1]
+        encodedHeight = (finalHeight + 50.0) / 200.0;
+    }
+    
+    gl_FragColor = vec4(encodedHeight, 0.0, 0.0, 1.0);
 }

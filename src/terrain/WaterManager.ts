@@ -1,6 +1,7 @@
 import { Scene, Mesh, PlaneGeometry, MeshPhongMaterial, DoubleSide, ShaderMaterial, MeshBasicMaterial } from 'three'
 import { HeightGenerator } from './HeightGenerator'
 import { ShaderManager } from '@/shaders/ShaderManager'
+import { globalProfiler } from '@/utils/Profiler'
 
 interface WaterMeshData {
     mesh: Mesh

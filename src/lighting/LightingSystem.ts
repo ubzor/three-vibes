@@ -1,5 +1,6 @@
 import { Scene, DirectionalLight, AmbientLight, HemisphereLight, Vector3, MathUtils, PointLight, Color } from 'three'
 import { ShaderManager, LightingUniforms } from '@/shaders/ShaderManager'
+import { globalProfiler } from '@/utils/Profiler'
 
 export class LightingSystem {
     private scene: Scene
@@ -16,7 +17,7 @@ export class LightingSystem {
         this.scene = scene
         this.sunPosition = new Vector3()
         this.moonPosition = new Vector3()
-        this.createLights()
+        globalProfiler.measure('💡 Lighting Setup', () => this.createLights())
     }
 
     setShaderManager(shaderManager: ShaderManager): void {
@@ -25,49 +26,61 @@ export class LightingSystem {
     }
 
     private createLights(): void {
+        globalProfiler.startStep('🔆 Light Creation')
+
         // Sun (directional light)
-        this.sunLight = new DirectionalLight(0xffffff, 3.0)
-        this.sunLight.position.set(100, 100, 50)
-        this.sunLight.target.position.set(0, 0, 0)
-        this.sunLight.castShadow = true
-        this.sunLight.shadow.mapSize.width = 4096
-        this.sunLight.shadow.mapSize.height = 4096
-        this.sunLight.shadow.camera.near = 0.5
-        this.sunLight.shadow.camera.far = 500
-        this.sunLight.shadow.camera.left = -100
-        this.sunLight.shadow.camera.right = 100
-        this.sunLight.shadow.camera.top = 100
-        this.sunLight.shadow.camera.bottom = -100
-        this.sunLight.shadow.bias = -0.0001
-        this.scene.add(this.sunLight)
-        this.scene.add(this.sunLight.target)
+        globalProfiler.measure('☀️ Sun Light', () => {
+            this.sunLight = new DirectionalLight(0xffffff, 3.0)
+            this.sunLight.position.set(100, 100, 50)
+            this.sunLight.target.position.set(0, 0, 0)
+            this.sunLight.castShadow = true
+            this.sunLight.shadow.mapSize.width = 4096
+            this.sunLight.shadow.mapSize.height = 4096
+            this.sunLight.shadow.camera.near = 0.5
+            this.sunLight.shadow.camera.far = 500
+            this.sunLight.shadow.camera.left = -100
+            this.sunLight.shadow.camera.right = 100
+            this.sunLight.shadow.camera.top = 100
+            this.sunLight.shadow.camera.bottom = -100
+            this.sunLight.shadow.bias = -0.0001
+            this.scene.add(this.sunLight)
+            this.scene.add(this.sunLight.target)
+        })
 
         // Moon (directional light) - неяркий голубоватый свет
-        this.moonLight = new DirectionalLight(0x88bbff, 0.3)
-        this.moonLight.position.set(-100, 80, -50)
-        this.moonLight.target.position.set(0, 0, 0)
-        this.moonLight.castShadow = true
-        this.moonLight.shadow.mapSize.width = 2048
-        this.moonLight.shadow.mapSize.height = 2048
-        this.moonLight.shadow.camera.near = 0.5
-        this.moonLight.shadow.camera.far = 500
-        this.moonLight.shadow.camera.left = -100
-        this.moonLight.shadow.camera.right = 100
-        this.moonLight.shadow.camera.top = 100
-        this.moonLight.shadow.camera.bottom = -100
-        this.moonLight.shadow.bias = -0.0001
-        this.moonLight.visible = false // Изначально невидимый
-        this.scene.add(this.moonLight)
-        this.scene.add(this.moonLight.target)
+        globalProfiler.measure('🌙 Moon Light', () => {
+            this.moonLight = new DirectionalLight(0x88bbff, 0.3)
+            this.moonLight.position.set(-100, 80, -50)
+            this.moonLight.target.position.set(0, 0, 0)
+            this.moonLight.castShadow = true
+            this.moonLight.shadow.mapSize.width = 2048
+            this.moonLight.shadow.mapSize.height = 2048
+            this.moonLight.shadow.camera.near = 0.5
+            this.moonLight.shadow.camera.far = 500
+            this.moonLight.shadow.camera.left = -100
+            this.moonLight.shadow.camera.right = 100
+            this.moonLight.shadow.camera.top = 100
+            this.moonLight.shadow.camera.bottom = -100
+            this.moonLight.shadow.bias = -0.0001
+            this.moonLight.visible = false // Изначально невидимый
+            this.scene.add(this.moonLight)
+            this.scene.add(this.moonLight.target)
+        })
 
         // Ambient light for overall brightness
-        this.ambientLight = new AmbientLight(0x404040, 0.8)
-        this.scene.add(this.ambientLight)
+        globalProfiler.measure('🌍 Ambient Light', () => {
+            this.ambientLight = new AmbientLight(0x404040, 0.8)
+            this.scene.add(this.ambientLight)
+        })
 
         // Sky light (hemisphere light) for realistic outdoor lighting
-        this.skyLight = new HemisphereLight(0x87ceeb, 0x8b7355, 0.8)
-        this.skyLight.position.set(0, 100, 0)
-        this.scene.add(this.skyLight)
+        globalProfiler.measure('🌤️ Sky Light', () => {
+            this.skyLight = new HemisphereLight(0x87ceeb, 0x8b7355, 0.8)
+            this.skyLight.position.set(0, 100, 0)
+            this.scene.add(this.skyLight)
+        })
+
+        globalProfiler.endStep()
     }
 
     setupDayLighting(): void {

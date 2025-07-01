@@ -1,5 +1,5 @@
 import { Perlin } from 'ts-noise'
-import { GPUHeightGenerator, HeightmapConfig } from './GPUHeightGenerator'
+import { GPUHeightGenerator, type HeightmapConfig } from './GPUHeightGenerator'
 import * as THREE from 'three'
 
 export class HeightGenerator {
@@ -7,70 +7,63 @@ export class HeightGenerator {
     private heightScale = 30
     private scale = 0.015
     private gpuGenerator: GPUHeightGenerator | null = null
-    private useGPU = false
     private renderer: THREE.WebGLRenderer | null = null
 
     constructor(renderer?: THREE.WebGLRenderer) {
         this.perlin = new Perlin(Math.random())
-        this.renderer = renderer || null
+        if (renderer) {
+            this.renderer = renderer
+            this.initializeGPUGenerator()
+        }
     }
 
-    async enableGPUGeneration(chunkSize: number = 100, resolution: number = 128): Promise<void> {
-        if (!this.renderer) {
-            return
-        }
+    private async initializeGPUGenerator(): Promise<void> {
+        if (!this.renderer) return
+
+        console.log('🖥️ Initializing GPU height generator...')
 
         const config: HeightmapConfig = {
-            chunkSize,
-            resolution,
+            chunkSize: 64,
+            resolution: 64,
             heightScale: this.heightScale,
             noiseScale: this.scale,
+            seed: Math.random(),
         }
 
         this.gpuGenerator = new GPUHeightGenerator(this.renderer, config)
-
         try {
             await this.gpuGenerator.initialize()
-            this.useGPU = true
+            console.log('✅ GPU height generator initialized successfully')
         } catch (error) {
+            console.warn('❌ Failed to initialize GPU height generator:', error)
+            console.warn('📋 Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                renderer: this.renderer ? 'Available' : 'Not available',
+                webgl2: this.renderer?.getContext() instanceof WebGL2RenderingContext ? 'Supported' : 'Not supported',
+            })
             this.gpuGenerator = null
-            this.useGPU = false
         }
     }
 
-    // Генерация массива высот для чанка (автоматически использует GPU если доступен)
-    async generateHeightmapChunk(
-        chunkX: number,
-        chunkZ: number,
-        chunkSize: number,
-        resolution: number
-    ): Promise<Float32Array> {
-        if (this.useGPU && this.gpuGenerator) {
+    // Метод для генерации heightmap для чанка
+    async generateHeightmapChunk(chunkX: number, chunkZ: number, size: number): Promise<Float32Array> {
+        if (this.gpuGenerator) {
             try {
                 return await this.gpuGenerator.generateHeightmapGPU(chunkX, chunkZ)
             } catch (error) {
-                // Fallback to CPU
+                console.warn('GPU generation failed, falling back to CPU:', error)
             }
         }
 
-        // CPU fallback
-        return this.generateHeightmapCPU(chunkX, chunkZ, chunkSize, resolution)
-    }
-
-    // CPU версия генерации массива высот
-    private generateHeightmapCPU(chunkX: number, chunkZ: number, chunkSize: number, resolution: number): Float32Array {
-        const heights = new Float32Array(resolution * resolution)
-
-        for (let y = 0; y < resolution; y++) {
-            for (let x = 0; x < resolution; x++) {
-                const worldX = chunkX * chunkSize + (x / resolution) * chunkSize
-                const worldZ = chunkZ * chunkSize + (y / resolution) * chunkSize
-
-                const height = this.generateHeight(worldX, worldZ)
-                heights[y * resolution + x] = height
+        // Fallback к CPU генерации
+        const heights = new Float32Array(size * size)
+        for (let z = 0; z < size; z++) {
+            for (let x = 0; x < size; x++) {
+                const worldX = chunkX * size + x
+                const worldZ = chunkZ * size + z
+                heights[z * size + x] = this.generateHeight(worldX, worldZ)
             }
         }
-
         return heights
     }
 
@@ -130,13 +123,6 @@ export class HeightGenerator {
         return finalHeight
     }
 
-    updateScale(newScale: number): void {
-        this.scale = newScale
-        if (this.gpuGenerator) {
-            this.gpuGenerator.updateConfig({ noiseScale: newScale })
-        }
-    }
-
     updateHeightScale(newHeightScale: number): void {
         this.heightScale = newHeightScale
         if (this.gpuGenerator) {
@@ -147,6 +133,37 @@ export class HeightGenerator {
     // Публичный метод для доступа к шуму из других классов
     getNoise2D(x: number, z: number): number {
         return this.perlin.get2([x, z])
+    }
+
+    // Метод для включения GPU генерации с настройками
+    async enableGPUGeneration(chunkSize: number, resolution: number): Promise<void> {
+        console.log(`🚀 Enabling GPU generation with chunk size: ${chunkSize}, resolution: ${resolution}`)
+
+        if (!this.renderer) {
+            console.error('❌ Renderer is required for GPU generation')
+            throw new Error('Renderer is required for GPU generation')
+        }
+
+        console.log(`🔧 Enabling GPU generation with chunkSize: ${chunkSize}, resolution: ${resolution}`)
+
+        const config: HeightmapConfig = {
+            chunkSize: chunkSize,
+            resolution: resolution,
+            heightScale: this.heightScale,
+            noiseScale: this.scale,
+            seed: Math.random(),
+        }
+
+        console.log('🔧 Creating GPU height generator with config:', config)
+        this.gpuGenerator = new GPUHeightGenerator(this.renderer, config)
+        try {
+            await this.gpuGenerator.initialize()
+            console.log('✅ GPU generation enabled successfully')
+        } catch (error) {
+            console.error('❌ Failed to enable GPU generation:', error)
+            this.gpuGenerator = null
+            throw error
+        }
     }
 
     dispose(): void {

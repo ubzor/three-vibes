@@ -13,6 +13,7 @@ import { CameraController } from '../camera/CameraController'
 import { LightingSystem } from '../lighting/LightingSystem'
 import { UIControls } from '../utils/UIControls'
 import { defaultSettings } from '../types/UISettings'
+import { globalProfiler } from '../utils/Profiler'
 
 export class LandscapeApp {
     private scene: Scene
@@ -50,20 +51,32 @@ export class LandscapeApp {
     async init(): Promise<void> {
         if (this.isInitialized) return
 
-        try {
-            this.setupCanvas()
-            this.setupRenderer()
-            this.setupScene()
-            await this.setupTerrain()
-            this.setupLighting()
-            this.setupControls()
-            this.setupEventListeners()
+        globalProfiler.clear()
+        globalProfiler.startStep('🚀 Application Initialization')
 
-            this.hideLoading()
-            this.startRenderLoop()
+        try {
+            globalProfiler.measure('📱 Canvas Setup', () => this.setupCanvas())
+            globalProfiler.measure('🖥️ Renderer Setup', () => this.setupRenderer())
+            globalProfiler.measure('🌍 Scene Setup', () => this.setupScene())
+            await globalProfiler.measureAsync('🏔️ Terrain Setup', () => this.setupTerrain())
+            globalProfiler.measure('💡 Lighting Setup', () => this.setupLighting())
+            globalProfiler.measure('🎮 Controls Setup', () => this.setupControls())
+            globalProfiler.measure('📡 Event Listeners Setup', () => this.setupEventListeners())
+
+            globalProfiler.measure('🎨 UI Finalization', () => {
+                this.hideLoading()
+                this.startRenderLoop()
+            })
+
+            globalProfiler.endStep()
+
+            // Выводим результаты профайлинга
+            globalProfiler.printResults()
+            this.printOptimizationSuggestions()
 
             this.isInitialized = true
         } catch (error) {
+            globalProfiler.endStep()
             this.showError('Failed to load 3D landscape')
         }
     }
@@ -155,9 +168,6 @@ export class LandscapeApp {
         this.renderer.setSize(window.innerWidth, window.innerHeight)
     }
     private async onSettingsChange(settings: any): Promise<void> {
-        if (settings.terrainScale !== undefined) {
-            this.terrainGenerator.updateScale(settings.terrainScale)
-        }
         if (settings.renderDistance !== undefined) {
             this.terrainGenerator.updateRenderDistance(settings.renderDistance)
         }
@@ -276,6 +286,37 @@ export class LandscapeApp {
             loading.textContent = message
             loading.style.background = 'rgba(120, 0, 0, 0.8)'
         }
+    }
+
+    private printOptimizationSuggestions(): void {
+        const totalTime = globalProfiler.getTotalTime()
+        const slowestSteps = globalProfiler.getSlowestSteps(3)
+
+        console.group('💡 Optimization Suggestions')
+        console.log(`Total initialization time: ${totalTime.toFixed(2)}ms`)
+
+        if (totalTime > 1000) {
+            console.warn('⚠️ Initialization took longer than 1 second')
+        }
+
+        console.log('\n🐌 Slowest steps:')
+        slowestSteps.forEach((step, index) => {
+            const percentage = (((step.duration || 0) / totalTime) * 100).toFixed(1)
+            console.log(`${index + 1}. ${step.name}: ${step.duration?.toFixed(2)}ms (${percentage}%)`)
+
+            // Предложения по оптимизации
+            if (step.name.includes('Terrain')) {
+                console.log('   💡 Consider: Reduce initial chunk count or use lower resolution')
+            }
+            if (step.name.includes('GPU') && (step.duration || 0) > 100) {
+                console.log('   💡 Consider: GPU might be busy, try CPU fallback')
+            }
+            if (step.name.includes('Biome') && (step.duration || 0) > 50) {
+                console.log('   💡 Consider: Reduce biome object density')
+            }
+        })
+
+        console.groupEnd()
     }
 
     dispose(): void {

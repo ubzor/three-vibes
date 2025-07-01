@@ -14,7 +14,7 @@ export class WaterManager {
     private heightGenerator: HeightGenerator
     private shaderManager: ShaderManager
     private waterMeshes: Map<string, WaterMeshData> = new Map()
-    private waterLevel = -2 // Единый уровень воды
+    private waterLevel = 0 // Единый уровень воды на высоте 0
     private wireframeEnabled = false
 
     constructor(scene: Scene, heightGenerator: HeightGenerator, shaderManager: ShaderManager) {
@@ -31,82 +31,91 @@ export class WaterManager {
             return
         }
 
-        let hasWaterAreas = false
-        let waterAreaCount = 0
+        // Упрощённый и более надёжный алгоритм:
+        // Если в чанке есть хотя бы одна точка ниже уровня воды - создаём водную поверхность
+        let hasWaterPoints = false
 
-        // Проверяем больше точек для более точного определения водных областей
-        const testResolution = 8 // Увеличиваем разрешение тестирования
-        for (let testX = 0; testX <= testResolution; testX++) {
-            for (let testZ = 0; testZ <= testResolution; testZ++) {
+        // Проверяем сетку точек с хорошим разрешением
+        const testResolution = 16 // Увеличиваем для большей точности
+        for (let testX = 0; testX <= testResolution && !hasWaterPoints; testX++) {
+            for (let testZ = 0; testZ <= testResolution && !hasWaterPoints; testZ++) {
                 const worldX = (testX / testResolution - 0.5) * chunkSize + chunkX * chunkSize
                 const worldZ = (testZ / testResolution - 0.5) * chunkSize + chunkZ * chunkSize
                 const height = this.heightGenerator.generateHeight(worldX, worldZ)
 
                 if (height < this.waterLevel) {
-                    waterAreaCount++
+                    hasWaterPoints = true
                 }
             }
         }
 
-        const totalTestPoints = (testResolution + 1) * (testResolution + 1)
-        // Снижаем требования еще больше - достаточно 8% точек под водой
-        hasWaterAreas = waterAreaCount >= Math.ceil(totalTestPoints * 0.08)
-
-        // Дополнительная проверка - если есть хотя бы одна глубокая точка,
-        // проверяем соседние области для создания связанных водоемов
-        if (!hasWaterAreas && waterAreaCount >= 1) {
-            hasWaterAreas = this.checkAdjacentWaterAreas(chunkX, chunkZ, chunkSize)
+        // Дополнительная проверка краёв чанка для соединения с соседними водоёмами
+        if (!hasWaterPoints) {
+            hasWaterPoints = this.checkChunkEdgesForWater(chunkX, chunkZ, chunkSize)
+            // if (hasWaterPoints) {
+            //     console.log(`🌊 Water created via edge check for chunk (${chunkX}, ${chunkZ})`)
+            // }
         }
 
-        // Проверяем, есть ли уже вода в соседних чанках (более агрессивно)
-        if (!hasWaterAreas && waterAreaCount > 0) {
-            hasWaterAreas = this.hasAdjacentWaterChunks(chunkX, chunkZ)
+        // Финальная проверка - есть ли соседние чанки с водой
+        if (!hasWaterPoints) {
+            hasWaterPoints = this.hasAdjacentWaterChunks(chunkX, chunkZ)
+            // if (hasWaterPoints) {
+            //     console.log(`🔗 Water created via adjacent check for chunk (${chunkX}, ${chunkZ})`)
+            // }
         }
 
-        if (hasWaterAreas) {
+        if (hasWaterPoints) {
             this.createWaterMesh(chunkX, chunkZ, chunkSize)
+            // Логируем только для отладки проблем с водой
+            // console.log(`💧 Water created for chunk (${chunkX}, ${chunkZ})`)
+        } else {
+            // console.log(`🏔️ No water needed for chunk (${chunkX}, ${chunkZ})`)
         }
     }
 
-    // Альтернативный подход - создание воды на основе глобального анализа
-    createWaterSurfaceAdvanced(chunkX: number, chunkZ: number, chunkSize: number): void {
-        const chunkKey = `${chunkX},${chunkZ}`
+    // Проверка краёв чанка для обеспечения непрерывности водоёмов
+    private checkChunkEdgesForWater(chunkX: number, chunkZ: number, chunkSize: number): boolean {
+        const edgePoints = []
+        const edgeResolution = 8
 
-        // Избегаем дублирования воды
-        if (this.waterMeshes.has(chunkKey)) {
-            return
+        // Левый край
+        for (let i = 0; i <= edgeResolution; i++) {
+            const worldX = chunkX * chunkSize - chunkSize * 0.5
+            const worldZ = (i / edgeResolution - 0.5) * chunkSize + chunkZ * chunkSize
+            edgePoints.push([worldX, worldZ])
         }
 
-        // Анализируем более широкую область вокруг чанка
-        const expandedArea = chunkSize * 1.5 // Расширяем область анализа
-        const centerX = chunkX * chunkSize
-        const centerZ = chunkZ * chunkSize
+        // Правый край
+        for (let i = 0; i <= edgeResolution; i++) {
+            const worldX = chunkX * chunkSize + chunkSize * 0.5
+            const worldZ = (i / edgeResolution - 0.5) * chunkSize + chunkZ * chunkSize
+            edgePoints.push([worldX, worldZ])
+        }
 
-        let lowPoints = 0
-        let totalPoints = 0
+        // Верхний край
+        for (let i = 0; i <= edgeResolution; i++) {
+            const worldX = (i / edgeResolution - 0.5) * chunkSize + chunkX * chunkSize
+            const worldZ = chunkZ * chunkSize - chunkSize * 0.5
+            edgePoints.push([worldX, worldZ])
+        }
 
-        // Проверяем расширенную область
-        for (let x = -expandedArea / 2; x <= expandedArea / 2; x += chunkSize / 10) {
-            for (let z = -expandedArea / 2; z <= expandedArea / 2; z += chunkSize / 10) {
-                const worldX = centerX + x
-                const worldZ = centerZ + z
-                const height = this.heightGenerator.generateHeight(worldX, worldZ)
+        // Нижний край
+        for (let i = 0; i <= edgeResolution; i++) {
+            const worldX = (i / edgeResolution - 0.5) * chunkSize + chunkX * chunkSize
+            const worldZ = chunkZ * chunkSize + chunkSize * 0.5
+            edgePoints.push([worldX, worldZ])
+        }
 
-                totalPoints++
-                if (height < this.waterLevel + 1) {
-                    // Немного выше уровня воды тоже считаем
-                    lowPoints++
-                }
+        // Проверяем каждую точку края
+        for (const [x, z] of edgePoints) {
+            const height = this.heightGenerator.generateHeight(x, z)
+            if (height < this.waterLevel) {
+                return true
             }
         }
 
-        const lowPointsPercent = lowPoints / totalPoints
-
-        // Создаем воду если в расширенной области достаточно низких точек
-        if (lowPointsPercent > 0.3) {
-            // 30% низких точек в области
-            this.createWaterMesh(chunkX, chunkZ, chunkSize)
-        }
+        return false
     }
 
     private hasAdjacentWaterChunks(chunkX: number, chunkZ: number): boolean {
@@ -129,43 +138,6 @@ export class WaterManager {
             }
         }
         return false
-    }
-
-    private checkAdjacentWaterAreas(chunkX: number, chunkZ: number, chunkSize: number): boolean {
-        // Проверяем границы с соседними чанками
-        const borderPoints = [
-            // Левая граница
-            ...Array.from({ length: 5 }, (_, i) => [
-                chunkX * chunkSize - chunkSize * 0.5,
-                (i / 4 - 0.5) * chunkSize + chunkZ * chunkSize,
-            ]),
-            // Правая граница
-            ...Array.from({ length: 5 }, (_, i) => [
-                chunkX * chunkSize + chunkSize * 0.5,
-                (i / 4 - 0.5) * chunkSize + chunkZ * chunkSize,
-            ]),
-            // Верхняя граница
-            ...Array.from({ length: 5 }, (_, i) => [
-                (i / 4 - 0.5) * chunkSize + chunkX * chunkSize,
-                chunkZ * chunkSize - chunkSize * 0.5,
-            ]),
-            // Нижняя граница
-            ...Array.from({ length: 5 }, (_, i) => [
-                (i / 4 - 0.5) * chunkSize + chunkX * chunkSize,
-                chunkZ * chunkSize + chunkSize * 0.5,
-            ]),
-        ]
-
-        let deepBorderPoints = 0
-        borderPoints.forEach(([x, z]) => {
-            const height = this.heightGenerator.generateHeight(x, z)
-            if (height < this.waterLevel) {
-                deepBorderPoints++
-            }
-        })
-
-        // Если более 20% граничных точек под водой, создаем воду для непрерывности
-        return deepBorderPoints >= Math.ceil(borderPoints.length * 0.2)
     }
 
     private createWaterMesh(chunkX: number, chunkZ: number, chunkSize: number): void {

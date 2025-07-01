@@ -35,6 +35,9 @@ export class TerrainGenerator {
     async initialize(): Promise<void> {
         await globalProfiler.measureAsync('🌱 Biome Manager Init', () => this.biomeManager.initialize())
 
+        // Устанавливаем начальный радиус рендеринга
+        this.chunkManager.setRenderRadius(this.renderDistance)
+
         // Включаем GPU генерацию по умолчанию
         if (this.renderer) {
             try {
@@ -80,6 +83,9 @@ export class TerrainGenerator {
         const chunkX = Math.floor(cameraPosition.x / this.chunkSize)
         const chunkZ = Math.floor(cameraPosition.z / this.chunkSize)
 
+        // Обновляем позицию центра для системы приоритетов
+        this.chunkManager.updateCameraPosition(cameraPosition.x, cameraPosition.z)
+
         // Генерируем новые чанки вокруг камеры в круговом радиусе
         for (let x = -this.renderDistance; x <= this.renderDistance; x++) {
             for (let z = -this.renderDistance; z <= this.renderDistance; z++) {
@@ -117,8 +123,11 @@ export class TerrainGenerator {
 
     updateRenderDistance(newDistance: number): void {
         this.renderDistance = newDistance
+        // Обновляем радиус рендеринга в chunk manager
+        this.chunkManager.setRenderRadius(newDistance)
     }
 
+    // Убираем отдельные методы для chunk render radius
     private regenerateAllChunks(): void {
         const chunkPositions = Array.from(this.chunkManager.getChunks().keys())
         chunkPositions.forEach(key => {
@@ -141,5 +150,9 @@ export class TerrainGenerator {
     }
     getShaderManager(): ShaderManager {
         return this.shaderManager
+    }
+
+    getWorkerStats(): any {
+        return this.chunkManager.getWorkerStats()
     }
 }

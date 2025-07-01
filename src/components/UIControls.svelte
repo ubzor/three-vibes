@@ -59,6 +59,11 @@
   export function getSettings(): UISettings {
     return { ...settings }
   }
+
+  // Новая функция для обновления статистики воркеров
+  export function updateWorkerStats(stats: any) {
+    settings.workerStats = stats
+  }
 </script>
 
 <div class="ui-controls" class:hidden={!visible}>
@@ -76,6 +81,57 @@
       <span class="triangles-value">{formattedTriangles}</span>
     </div>
   </div>
+
+  <!-- Workers Section -->
+  {#if settings.workerStats}
+  <div class="control-group workers">
+    <h4>Chunk Workers:</h4>
+    {#if settings.workerStats.workerPool}
+    <div class="worker-stats">
+      <div class="stat-row">
+        <span>Workers:</span>
+        <span class="stat-value">{settings.workerStats.workerPool.totalWorkers}</span>
+      </div>
+      <div class="stat-row">
+        <span>Available:</span>
+        <span class="stat-value">{settings.workerStats.workerPool.availableWorkers}</span>
+      </div>
+      <div class="stat-row">
+        <span>Busy:</span>
+        <span class="stat-value">{settings.workerStats.workerPool.busyWorkers}</span>
+      </div>
+      <div class="stat-row">
+        <span>Queued:</span>
+        <span class="stat-value">{settings.workerStats.workerPool.queuedTasks}</span>
+      </div>
+    </div>
+    {/if}
+    {#if settings.workerStats.stateManager}
+    <div class="chunk-stats">
+      <div class="stat-row">
+        <span>Total:</span>
+        <span class="stat-value">{settings.workerStats.stateManager.total}</span>
+      </div>
+      <div class="stat-row">
+        <span>Pending:</span>
+        <span class="stat-value chunk-pending">{settings.workerStats.stateManager.pending}</span>
+      </div>
+      <div class="stat-row">
+        <span>Generating:</span>
+        <span class="stat-value chunk-generating">{settings.workerStats.stateManager.generating}</span>
+      </div>
+      <div class="stat-row">
+        <span>Ready:</span>
+        <span class="stat-value chunk-ready">{settings.workerStats.stateManager.ready}</span>
+      </div>
+      <div class="stat-row">
+        <span>Rendered:</span>
+        <span class="stat-value chunk-rendered">{settings.workerStats.stateManager.rendered}</span>
+      </div>
+    </div>
+    {/if}
+  </div>
+  {/if}
 
   
   <!-- Render Distance -->
@@ -194,6 +250,55 @@
     padding: 10px;
     border-radius: 5px;
     margin-bottom: 20px;
+  }
+
+  .control-group.workers {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+  }
+
+  .worker-stats, .chunk-stats {
+    margin-bottom: 10px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+    font-size: 12px;
+  }
+
+  .stat-value {
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #90caf9;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  .stat-value.chunk-pending {
+    background: rgba(255, 193, 7, 0.3);
+    color: #ffb74d;
+  }
+
+  .stat-value.chunk-generating {
+    background: rgba(33, 150, 243, 0.3);
+    color: #64b5f6;
+  }
+
+  .stat-value.chunk-ready {
+    background: rgba(76, 175, 80, 0.3);
+    color: #81c784;
+  }
+
+  .stat-value.chunk-rendered {
+    background: rgba(156, 39, 176, 0.3);
+    color: #ba68c8;
   }
 
   .fps-display, .triangles-display {

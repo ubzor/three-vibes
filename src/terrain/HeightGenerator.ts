@@ -8,9 +8,11 @@ export class HeightGenerator {
     private scale = 0.015
     private gpuGenerator: GPUHeightGenerator | null = null
     private renderer: THREE.WebGLRenderer | null = null
+    private seed: number // Добавляем сохранение seed
 
     constructor(renderer?: THREE.WebGLRenderer) {
-        this.perlin = new Perlin(Math.random())
+        this.seed = Math.random() // Сохраняем seed
+        this.perlin = new Perlin(this.seed)
         if (renderer) {
             this.renderer = renderer
             this.initializeGPUGenerator()
@@ -170,5 +172,17 @@ export class HeightGenerator {
         if (this.gpuGenerator) {
             this.gpuGenerator.dispose()
         }
+    }
+
+    getSeed(): number {
+        return this.seed
+    }
+
+    getScale(): number {
+        return this.scale
+    }
+
+    getHeightScale(): number {
+        return this.heightScale
     }
 }

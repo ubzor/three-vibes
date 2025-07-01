@@ -52,6 +52,14 @@ export class UIControls {
         }
     }
 
+    updateWorkerStats(stats: any): void {
+        this.settings.workerStats = stats
+        // Используем экспортированную функцию компонента
+        if (this.component && this.component.updateWorkerStats) {
+            this.component.updateWorkerStats(stats)
+        }
+    }
+
     updateSetting(key: keyof UISettings, value: any): void {
         this.settings[key] = value as never
         if (this.component && this.component.updateSetting) {

@@ -5,6 +5,7 @@ export interface UISettings {
     fogDensity: number
     fps: number
     triangles: number
+    workerStats?: any
 }
 
 export const defaultSettings: UISettings = {
@@ -14,4 +15,5 @@ export const defaultSettings: UISettings = {
     fogDensity: 0.01,
     fps: 0,
     triangles: 0,
+    workerStats: null,
 }

@@ -218,6 +218,10 @@ export class LandscapeApp {
             // Update UI with smoothed FPS
             this.uiControls.updateFPS(this.fps)
 
+            // Update worker stats
+            const workerStats = this.terrainGenerator.getWorkerStats()
+            this.uiControls.updateWorkerStats(workerStats)
+
             // Reset counters
             this.frameCount = 0
             this.lastTime = currentTime
